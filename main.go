@@ -15,6 +15,8 @@ type TokenType int8
 type AtomType int8
 type ExprType int8
 
+type Environment map[string]any
+
 const (
 	TOKEN_LPAREN TokenType = iota
 	TOKEN_RPAREN
@@ -33,13 +35,13 @@ type Token struct {
 }
 
 type Atom struct {
-	atomKind  AtomType
-	atomValue interface{}
+	atomType  AtomType
+	atomValue any
 }
 
 type Expr struct {
-	exprKind  ExprType
-	exprValue interface{}
+	exprType  ExprType
+	exprValue any
 }
 
 func (t TokenType) String() string {
@@ -54,12 +56,24 @@ func (t TokenType) String() string {
 		return "SYMBOL"
 	}
 }
-func (t ExprType) String() string {
-	switch t {
-	case EXPR_ATOM:
-		return "ATOM"
-	default:
-		return "LIST"
+
+func (token Token) String() string {
+	return fmt.Sprintf("'%v = %v'", token.tokenType, token.tokenValue)
+}
+
+func (atom Atom) String() string {
+	return fmt.Sprintf("'%v'", atom.atomValue)
+}
+
+func (ast Expr) String() string {
+	if ast.exprType == EXPR_ATOM {
+		return ast.exprValue.(Atom).String()
+	} else {
+		list := make([]string, 0)
+		for _, e := range ast.exprValue.([]Expr) {
+			list = append(list, e.String())
+		}
+		return fmt.Sprintf("[ %s ]", strings.Join(list, " "))
 	}
 }
 
@@ -85,14 +99,6 @@ func tokenize(source string) []Token {
 		}
 	}
 	return tokens
-}
-
-func printTokens(tokens []Token) {
-	fmt.Println("[")
-	for _, token := range tokens {
-		fmt.Printf("\t%s = %s\n", token.tokenType, token.tokenValue)
-	}
-	fmt.Println("]")
 }
 
 func nextToken(tokens *[]Token) Token {
@@ -135,12 +141,29 @@ func parseAtom(token Token) Atom {
 	}
 }
 
+func createEnv() map[string]any {
+}
+
+func evaluate(ast Expr, env Environment) Expr {
+	switch ast.exprType {
+	case EXPR_ATOM:
+		switch ast.exprValue.(Atom).atomType {
+		case ATOM_SYMBOL:
+			return env[ast.exprValue.(Atom).atomValue.(string)].(Expr)
+		default:
+			return ast.exprValue.(Atom).atomValue.(Expr)
+		}
+	}
+}
+
 func main() {
 	tokens := tokenize("(begin (define r 10) (* pi (* r r)))")
-	printTokens(tokens)
+	fmt.Println(tokens)
 	ast, err := parse(&tokens)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	fmt.Println(ast)
+	global_env := createEnv()
+	evaluate(ast, global_env)
 }
